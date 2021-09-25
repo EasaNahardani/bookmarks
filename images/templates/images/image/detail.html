@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ image.title }}{% endblock %}
+
+{% block content %}
+  <h1>{{ image.title }}</h1>
+  {% load thumbnail %}
+  <a href="{{ image.image.url }}">
+    <img src="{% thumbnail image.image 300x0 %}" class="image-detail">
+  </a>
+  {% with  total_likes=image.users_like.count  users_like=image.users_like.all %}
+    <div class="image-info">
+      <div>
+        <span class="count">
+          <span class="total">{{ total_likes }}</span>
+           like{{ total_likes|pluralize }}
+        </span>
+        <a href="#" data-id="{{ image.id }}" data-action="{% if request.user in users_like %}un{% endif %}like"
+          class="like button">
+        {% if request.user not in users_like %}
+          Like
+        {% else %}
+          Unlike
+        {% endif %}
+        </a>
+      </div>
+      {{ image.description|linebreaks }}
+    </div>
+    <div class="image-likes">
+      {% for user in users_like %}
+        <div>
+
+          <img src="{% thumbnail  user.profile.photo|default:'avatar.jpg'  200x200  crop='smart' %}" id="{{user.id}}">
+
+          <p>{{ user.first_name }}</p>
+        </div>
+      {% empty %}
+        Nobody likes this image yet.
+      {% endfor %}
+    </div>
+  {% endwith %}
+{% endblock %}
+
+{% block domready %}
+  $('a.like').click(function(e){
+    e.preventDefault();
+    $.post('{% url "images:like" %}',
+      {
+        id: $(this).data('id'),
+        action: $(this).data('action')
+      },
+      function(data){
+        if (data['status'] == 'ok')
+        {
+          var previous_action = $('a.like').data('action');
+
+          // toggle data-action
+          $('a.like').data('action', previous_action == 'like' ? 'unlike' : 'like');
+          // toggle link text
+          $('a.like').text(previous_action == 'like' ? 'Unlike' : 'Like');
+
+          // update total likes
+          var previous_likes = parseInt($('span.count .total').text());
+          $('span.count .total').text(previous_action == 'like' ? previous_likes + 1 : previous_likes - 1);
+
+          // update users photo
+          var images_div = $('.image-likes');
+          if(previous_action == 'like'){
+            box_html = '<div><img src="{% thumbnail  user.profile.photo|default:"avatar.jpg"  200x200  crop="smart" %}" id="{{user.id}}"><p>{{ user.first_name }}</p></div>';
+            if( is_children(images_div, box_html)){
+              images_div.append(box_html);
+            }
+            }else if(images_div.find("img[id='{{user.id}}']").length > 0) {
+              images_div.find('img[id="{{user.id}}"]').parent().remove();
+              is_children(images_div, 'Nobody likes this image yet.');
+            }
+
+            function is_children(select, data){
+              if( select.children().length < 1){
+               select.html(data)
+               return false;
+              }
+              return true;
+            }
+
+
+            /* راه دوم برای حذف تصویر
+            else if($('.image-likes img[src*="{{request.user.profile.photo}}"]').length > 0) {
+              $('.image-likes img[src*="{{request.user.profile.photo}}"]').parent().remove();
+            }
+            else{
+              $('.image-likes img[src*="avatar.jpg"]').parent().last().remove();
+            }
+             is_children('Nobody likes this image yet.');
+             */ پایان
+
+        }
+      }//end callback for post
+    );
+  });//end click function
+
+
+
+{% endblock %}
